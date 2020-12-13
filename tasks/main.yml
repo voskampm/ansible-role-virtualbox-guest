@@ -13,6 +13,9 @@
       register: host_vbox_version
       become: no
 
+    - debug:
+        msg: "host_vbox_version looks like {{ host_vbox_version }}"
+
     - name: Check if virtualbox_version could be determined
       fail:
         msg: "Could not determine virtualbox_version - please specify this variable"
@@ -29,6 +32,15 @@
   register: vbox_guest_version
   changed_when: vbox_guest_version.stdout != virtualbox_version
   ignore_errors: yes
+
+- debug:
+    msg: "virtualbox_version:  {{ virtualbox_version }}"
+
+- debug:
+    msg: "vbox_guest_version.stdout {{ vbox_guest_version.stdout }}"
+
+#- debug:
+#    msg: "virtualbox_keep {{ virtualbox_keep }}"
 
 - block:
     - name: "Copy ISO file from guest to host"
@@ -52,6 +64,9 @@
       ignore_errors: yes
       when: file_path.stat.exists is not defined
 
+    - debug:
+        msg: "file_path.stat.exists: {{ file_path.stat.exists }}" 
+
     - name: Check if CD or ISO file is present on the host
       block:
         - debug:
@@ -62,17 +77,23 @@
             url: http://download.virtualbox.org/virtualbox/{{ virtualbox_version }}/VBoxGuestAdditions_{{ virtualbox_version }}.iso
             dest: "{{ virtualbox_iso }}"
 
+        - debug:
+            msg: "virtualbox_iso: {{ virtualbox_iso }}"
+
         - name: Re-check if the ISO file is present on the host
           stat:
             path: "{{ virtualbox_iso }}"
-            register: file_path
+          register: file_path
+
+        - debug:
+            msg: " file_path: {{  file_path }}"
 
         - name: Fail if CD or ISO file is still not present on the host
           fail:
             msg: "Could not find necessary CD or ISO file on the host, nor download it"
-          when: file_path.stat.exists is not defined
+          when: file_path.stat.exists == false
 
-      when: file_path.stat.exists is not defined and CD_path.stat.exists is not defined
+      when: (file_path.stat.exists is not defined and CD_path.stat.exists is not defined) or file_path.stat.exists == false
 
     - name: Use correct ISO path (file or CD)
       set_fact:
@@ -141,7 +162,7 @@
 
         - name: Install latest kernel and headers for CentOSes
           yum:
-            name: ["kernel", "kernel-headers-{{ kernel.stdout }}", "kernel-devel", "elfutils-libelf-devel"]
+            name: ["kernel", "kernel-headers", "kernel-devel", "elfutils-libelf-devel"]
             state: latest  # needed latest for dmks to find matching header
             update_cache: yes
           when: kernel is defined and kernel.stdout is defined
